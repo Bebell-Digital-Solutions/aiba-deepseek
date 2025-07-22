@@ -1,1 +1,326 @@
 
+/>
+                
+                <button
+                  type="submit"
+                  disabled={isLoading || !isApiConfigured || !inputValue.trim()}
+                  className={`absolute right-0 top-0 h-14 w-14 flex items-center justify-center text-white rounded-full transition-transform transform ${inputValue.trim() && isApiConfigured ? 'scale-100' : 'scale-0'} ${isLoading ? 'bg-gray-500' : 'bg-brand-pink'} disabled:bg-gray-500`}
+                  aria-label="Enviar mensaje"
+                >
+                  <span className="material-symbols-rounded">send</span>
+                </button>
+              </form>
+              <div className="hidden sm:flex items-center gap-3">
+                <IconButton 
+                  onClick={onOpenUploadModal} 
+                  icon="upload_file" 
+                  label="Subir archivos" 
+                  disabled={isLoading || !isApiConfigured} 
+                />
+                <IconButton 
+                  onClick={toggleTheme} 
+                  icon={theme === 'dark' ? 'light_mode' : 'dark_mode'} 
+                  label="Cambiar tema" 
+                />
+                <IconButton 
+                  onClick={onDeleteChat} 
+                  icon="delete" 
+                  label="Eliminar chat" 
+                  disabled={isLoading || !isApiConfigured} 
+                />
+              </div>
+              <div className="sm:hidden flex">
+                <IconButton 
+                  onClick={onOpenApiKeyModal} 
+                  icon="key" 
+                  label="Gestionar API Key" 
+                />
+              </div>
+            </div>
+            <p className="hidden sm:block text-center text-xs text-gray-400 dark:text-gray-500 mt-3 px-4">
+              AIBAD puede mostrar información inexacta. Siempre verifica sus respuestas.
+            </p>
+          </div>
+        </div>
+      );
+    };
+    
+    
+    // Componente principal de la aplicación con todas las nuevas características
+    const App = () => {
+      const [theme, setTheme] = useState(() => {
+        const savedTheme = localStorage.getItem("mega-bot-theme");
+        return savedTheme === 'light' || savedTheme === 'dark' 
+          ? savedTheme 
+          : window.matchMedia?.('(prefers-color-scheme: dark)').matches 
+            ? 'dark' 
+            : 'light';
+      });
+      
+      const [messages, setMessages] = useState([]);
+      const [isLoading, setIsLoading] = useState(false);
+      const [isFileModalOpen, setFileModalOpen] = useState(false);
+      const [uploadedFiles, setUploadedFiles] = useState([]);
+      const [apiKey, setApiKey] = useState(() => localStorage.getItem('deepseek-api-key') || null);
+      const [userName, setUserName] = useState(() => localStorage.getItem('user-name') || null);
+      const [showApiKeyModal, setShowApiKeyModal] = useState(!apiKey);
+      const [showConversationsModal, setShowConversationsModal] = useState(false);
+      const [conversations, setConversations] = useState(() => {
+        const saved = localStorage.getItem('aibad-conversations');
+        return saved ? JSON.parse(saved) : [];
+      });
+      const [initError, setInitError] = useState(null);
+      const [inputValue, setInputValue] = useState('');
+
+      useEffect(() => {
+        document.documentElement.classList.toggle('dark', theme === 'dark');
+        localStorage.setItem('mega-bot-theme', theme);
+      }, [theme]);
+
+      // Guardar conversaciones en localStorage cuando cambian
+      useEffect(() => {
+        localStorage.setItem('aibad-conversations', JSON.stringify(conversations));
+      }, [conversations]);
+
+      const toggleTheme = useCallback(() => {
+        setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+      }, []);
+
+      const handleSaveApiKey = useCallback((key, name = '') => {
+        try {
+          localStorage.setItem('deepseek-api-key', key);
+          if (name) {
+            localStorage.setItem('user-name', name);
+            setUserName(name);
+          } else {
+            localStorage.removeItem('user-name');
+            setUserName(null);
+          }
+          setApiKey(key);
+          setShowApiKeyModal(false);
+          setInitError(null);
+          
+          if (messages.length === 0) {
+            setMessages([{
+              id: 'bot-welcome',
+              sender: 'bot',
+              text: name 
+                ? `¡Hola ${name}! Soy AIBAD, tu Asistente de IA para Negocios. ¿Cómo puedo ayudarte hoy?`
+                : "¡Hola! Soy AIBAD, tu Asistente de IA para Negocios. ¿Cómo puedo ayudarte hoy?",
+              isError: false
+            }]);
+          }
+        } catch (e) {
+          console.error("Error al guardar configuración:", e);
+          setInitError("Error al guardar configuración. Por favor verifica la configuración de tu navegador.");
+        }
+      }, [messages]);
+
+      const handleDeleteApiKey = useCallback(() => {
+        localStorage.removeItem('deepseek-api-key');
+        localStorage.removeItem('user-name');
+        setApiKey(null);
+        setUserName(null);
+        setShowApiKeyModal(true);
+        setMessages([]);
+      }, []);
+
+      const handleSendMessage = useCallback(async (inputText) => {
+        if (!inputText.trim() || isLoading || !apiKey) return;
+        
+        setIsLoading(true);
+        const userMessage = { 
+          id: generateId(), 
+          sender: 'user', 
+          text: inputText 
+        };
+        const botMessage = { 
+          id: generateId(), 
+          sender: 'bot', 
+          text: '', 
+          isError: false 
+        };
+        
+        setMessages(prev => [...prev, userMessage, botMessage]);
+        
+        try {
+          const fileContext = uploadedFiles.map(f => `${f.name}:\n${f.content}`).join('\n\n');
+          
+          const messagesForApi = [
+            { role: 'system', content: MASTER_PROMPT },
+            ...messages.filter(msg => msg.sender !== 'bot' || msg.text).map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.text
+            })),
+            { role: 'user', content: fileContext ? `${fileContext}\n\n${inputText}` : inputText }
+          ];
+
+          const response = await fetch(DEEPSEEK_API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apiKey}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              model: DEEPSEEK_MODEL,
+              messages: messagesForApi,
+              stream: false,
+              temperature: 0.7
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.error?.message || `La solicitud API falló con estado ${response.status}`);
+          }
+
+          const data = await response.json();
+          const content = data.choices[0]?.message?.content || '';
+          
+          setMessages(prev => prev.map(msg => 
+            msg.id === botMessage.id 
+              ? { ...msg, text: content } 
+              : msg
+          ));
+
+          // Guardar automáticamente la conversación cuando el bot responde
+          saveCurrentConversation();
+
+        } catch (error) {
+          console.error('Error de API:', error);
+          setMessages(prev => prev.map(msg => 
+            msg.id === botMessage.id 
+              ? { ...msg, text: `Error: ${error.message}`, isError: true } 
+              : msg
+          ));
+          if (error.message.includes('401')) {
+            handleDeleteApiKey();
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      }, [apiKey, isLoading, messages, uploadedFiles, handleDeleteApiKey]);
+
+      const saveCurrentConversation = useCallback(() => {
+        if (messages.length === 0) return;
+        
+        const newConversation = {
+          id: generateId(),
+          timestamp: Date.now(),
+          messages: [...messages],
+          files: [...uploadedFiles]
+        };
+        
+        setConversations(prev => [newConversation, ...prev]);
+      }, [messages, uploadedFiles]);
+
+      const loadConversation = useCallback((conversation) => {
+        setMessages(conversation.messages);
+        setUploadedFiles(conversation.files);
+        setShowConversationsModal(false);
+      }, []);
+
+      const deleteConversation = useCallback((id) => {
+        setConversations(prev => prev.filter(c => c.id !== id));
+      }, []);
+
+      const handleDeleteChat = useCallback(() => {
+        if (messages.length > 0 && window.confirm("¿Estás seguro de que quieres eliminar el historial del chat?")) {
+          setMessages([]);
+          setUploadedFiles([]);
+        }
+      }, [messages.length]);
+
+      const handleSuggestionClick = useCallback((text) => {
+        setInputValue(text);
+      }, []);
+
+      if (initError) {
+        return (
+          <div className="flex items-center justify-center h-screen bg-white dark:bg-gray-900">
+            <div className="text-center p-8 max-w-md">
+              <h2 className="text-2xl font-bold text-red-500 mb-4">Error de inicialización</h2>
+              <p className="text-gray-700 dark:text-gray-300 mb-6">{initError}</p>
+              <button
+                onClick={() => setShowApiKeyModal(true)}
+                className="px-6 py-2 bg-brand-pink text-white rounded-full font-medium hover:opacity-90"
+              >
+                Ingresar API Key
+              </button>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="flex flex-col h-screen max-h-screen bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-200">
+          {messages.filter(m => m.sender === MessageSender.USER).length === 0 ? (
+            <Header onSuggestionClick={handleSuggestionClick} userName={userName} />
+          ) : (
+            <ChatView messages={messages} />
+          )}
+          
+          <TypingArea
+            onSendMessage={handleSendMessage}
+            isLoading={isLoading}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            onDeleteChat={handleDeleteChat}
+            onOpenUploadModal={() => setFileModalOpen(true)}
+            onOpenApiKeyModal={() => setShowApiKeyModal(true)}
+            onOpenConversationsModal={() => setShowConversationsModal(true)}
+            isApiConfigured={!!apiKey}
+            uploadedFilesCount={uploadedFiles.length}
+            inputValue={inputValue}
+            setInputValue={setInputValue}
+          />
+            
+            {showApiKeyModal && (
+              <ApiKeyModal
+                onSave={handleSaveApiKey}
+                onDelete={handleDeleteApiKey}
+                onClose={() => {
+                  if (apiKey) {
+                    setShowApiKeyModal(false);
+                  }
+                }}
+                currentKey={apiKey}
+              />
+            )}
+            
+            {isFileModalOpen && (
+              <FileUploadModal
+                uploadedFiles={uploadedFiles}
+                setUploadedFiles={setUploadedFiles}
+                onClose={() => setFileModalOpen(false)}
+              />
+            )}
+
+            {showConversationsModal && (
+              <ConversationsModal
+                conversations={conversations}
+                onSelectConversation={loadConversation}
+                onDeleteConversation={deleteConversation}
+                onClose={() => setShowConversationsModal(false)}
+              />
+            )}
+          </div>
+        );
+      };
+
+      document.addEventListener('DOMContentLoaded', function() {
+        lucide.createIcons();
+      });
+
+      // Renderizar la aplicación
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(
+          <ErrorBoundary>
+            <App />
+          </ErrorBoundary>
+      );
+</script>
+</body>
+</html>
+
+                
