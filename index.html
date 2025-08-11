@@ -3,26 +3,18 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  
-  
-  
+
   <title>AIBAD - AI Business Assistant, powered by DeepSeek</title>
   
-  
-  
-  
+ 
   <!-- Preconnect to CDNs for faster loading -->
   <link rel="preconnect" href="https://unpkg.com">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  
-  
-  
+   
   
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  
   
   
   <!-- Required Libraries -->
@@ -225,9 +217,7 @@
 
 <body class="font-sans bg-white dark:bg-gray-900 transition-colors duration-300">
 
-
-
-    
+   
          <div class="custom-image-widget" style="position: relative; display: inline-block;"> <!-- ADD THESE STYLES -->
     <a href="https://bebell-digital-solutions.github.io/aiba-deepseek/es-v03">
         <img class="custom-image" 
@@ -239,38 +229,26 @@
 </div>
 
 
-
-
-
-
-
-
-
-
   
   
   <div id="root"></div>
-
+  
+ 
+  
+  
 
 
 <script type="text/babel">
-// Safety checks first
-if (typeof ReactMarkdown === 'undefined') {
-  window.ReactMarkdown = ({ children }) => <div>{children}</div>;
-  console.warn("ReactMarkdown not loaded - using fallback");
-}
+    // Safety checks first
+    if (typeof ReactMarkdown === 'undefined') {
+      window.ReactMarkdown = ({ children }) => <div>{children}</div>;
+      console.warn("ReactMarkdown not loaded - using fallback");
+    }
+    if (typeof remarkGfm === 'undefined') {
+      window.remarkGfm = { default: null };
+      console.warn("remarkGfm not loaded - markdown features limited");
+    }
 
-if (typeof remarkGfm === 'undefined') {
-  window.remarkGfm = null;
-  console.warn("remarkGfm not loaded - markdown features limited");
-}
-
-// Helper to always get the correct plugin reference
-const gfmPlugin =
-  (typeof remarkGfm !== 'undefined' && (remarkGfm?.default || remarkGfm)) || null;
-
-
-  
     const { useState, useEffect, useRef, useCallback } = React;
     
     // Unique ID generator
@@ -279,7 +257,7 @@ const gfmPlugin =
     // Constants
     const MessageSender = {
       USER: 'user',
-      BOT: 'bot',
+      BOT: 'AI Business Assistant',
     };
 
     const SUGGESTIONS = [
@@ -507,7 +485,7 @@ const gfmPlugin =
               {isLoading ? <LoadingIndicator /> : (
                 <div className={`markdown-content ${messageContentClass}`}>
                   <ReactMarkdown 
-                    remarkPlugins={gfmPlugin ? [gfmPlugin] : []}
+                    remarkPlugins={[remarkGfm.default]}
                     components={{
                       h2: ({node, ...props}) => <h2 className="text-xl font-bold mt-6 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700" {...props} />,
                       h3: ({node, ...props}) => <h3 className="text-lg font-semibold mt-4 mb-2 text-brand-pink" {...props} />,
