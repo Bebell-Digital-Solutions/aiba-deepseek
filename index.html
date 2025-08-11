@@ -38,7 +38,6 @@
   
     <!-- Add Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <link rel="stylesheet" href="https://unpkg.com/lucide@latest/font/lucide.css">
   
   <!-- Favicon -->
   <link rel="icon" href="https://bucket.mlcdn.com/a/3336/3336910/images/d7589a2b7ec7033c2395042f615b8c5d96cc06af.png">
@@ -251,37 +250,27 @@
   
   
   <div id="root"></div>
-  
- 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
 
 
 
 <script type="text/babel">
-    // Safety checks first
-    if (typeof ReactMarkdown === 'undefined') {
-      window.ReactMarkdown = ({ children }) => <div>{children}</div>;
-      console.warn("ReactMarkdown not loaded - using fallback");
-    }
-    if (typeof remarkGfm === 'undefined') {
-      window.remarkGfm = { default: null };
-      console.warn("remarkGfm not loaded - markdown features limited");
-    }
+// Safety checks first
+if (typeof ReactMarkdown === 'undefined') {
+  window.ReactMarkdown = ({ children }) => <div>{children}</div>;
+  console.warn("ReactMarkdown not loaded - using fallback");
+}
 
+if (typeof remarkGfm === 'undefined') {
+  window.remarkGfm = null;
+  console.warn("remarkGfm not loaded - markdown features limited");
+}
+
+// Helper to always get the correct plugin reference
+const gfmPlugin =
+  (typeof remarkGfm !== 'undefined' && (remarkGfm?.default || remarkGfm)) || null;
+
+
+  
     const { useState, useEffect, useRef, useCallback } = React;
     
     // Unique ID generator
@@ -518,7 +507,7 @@
               {isLoading ? <LoadingIndicator /> : (
                 <div className={`markdown-content ${messageContentClass}`}>
                   <ReactMarkdown 
-                    remarkPlugins={[remarkGfm.default]}
+                    remarkPlugins={gfmPlugin ? [gfmPlugin] : []}
                     components={{
                       h2: ({node, ...props}) => <h2 className="text-xl font-bold mt-6 mb-3 pb-2 border-b border-gray-200 dark:border-gray-700" {...props} />,
                       h3: ({node, ...props}) => <h3 className="text-lg font-semibold mt-4 mb-2 text-brand-pink" {...props} />,
