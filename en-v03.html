@@ -624,7 +624,7 @@ Your responses should:
         unwrapDisallowed={true}  // This removes the markdown symbols
         disallowedElements={['h1', 'h2', 'h3']} // Treat all headings as paragraphs
       >
-        {message.text.replace(/\*\*/g, '')} // Removes leftover ** symbols
+        {message.text.replace(/\*\*/g, '')}
       </ReactMarkdown>
     </div>
           )}
