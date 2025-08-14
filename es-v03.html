@@ -508,7 +508,7 @@
     };
     
     // ChatMessage component
- const ChatMessage = ({ message }) => {
+const ChatMessage = ({ message }) => {
   const [copyIcon, setCopyIcon] = useState('content_copy');
   const isBot = message.sender === MessageSender.BOT;
   const isLoading = isBot && message.text === '' && !message.isError;
